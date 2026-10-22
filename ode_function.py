@@ -3,7 +3,7 @@ from abc import ABC
 from typing import get_type_hints
 import numpy as np
 
-from ode_types import real_t, np_1D_real_arr, np_2D_real_arr, ftype, vftype
+from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr, ftype, vftype
 
 
 class ODEFunction(ABC):

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from constants import TOL
-from ode_types import real_t, np_1D_real_arr
-from ode_function import ODEFunction
+from lib.constants import TOL
+from lib.ode_types import real_t, np_1D_real_arr
+from lib.ode_function import ODEFunction
 
 
 @dataclass(frozen=True)

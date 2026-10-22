@@ -1,9 +1,9 @@
 import numpy as np
 
-from ode_types import np_1D_real_arr, np_2D_real_arr
+from lib.ode_types import np_1D_real_arr, np_2D_real_arr
 
-from ode_solver import ODESolver, ForwardEuler
-from ode_solver_params import ODESolverParams
+from lib.ode_solver import ODESolver, ForwardEuler
+from lib.ode_solver_params import ODESolverParams
 
 
 class MultistepMethod(ODESolver):
