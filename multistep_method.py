@@ -1,6 +1,6 @@
 import numpy as np
 
-from lib.ode_types import np_1D_real_arr, np_2D_real_arr
+from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
 from lib.ode_solver import ODESolver, ForwardEuler
 from lib.ode_solver_params import ODESolverParams
@@ -27,12 +27,17 @@ class MultistepMethod(ODESolver):
     @classmethod
     def _cdn_a(cls, n: int):
         """Generates the conditions of a_m of Thm 2.1 as a matrix"""
-        return np.array([[i**j for i in range(n)] for j in range(1, n + 1)])
+        return np.array(
+            [[i**j for i in range(n)] for j in range(1, n + 1)], dtype=real_t
+        )
 
     @classmethod
     def _cdn_b(cls, n: int):
         """Generates the conditions of b_m in Thm 2.1 as a matrix"""
-        return np.array([[j * i ** (j - 1) for i in range(n)] for j in range(1, n + 1)])
+        return np.array(
+            [[j * i ** (j - 1) for i in range(n)] for j in range(1, n + 1)],
+            dtype=real_t,
+        )
 
     @classmethod
     def _b_from_a(cls, a: np.ndarray, order: int, is_explicit: bool = False):
@@ -46,10 +51,14 @@ class MultistepMethod(ODESolver):
         #       > Consider letting order b a driven value instead of a requested one
         if len(a) != order:
             raise ValueError(f"a is length {len(a)}, but order {order}")
+
         order_b = order - (1 if is_explicit else 0)
+
         A, B = MultistepMethod._cdn_a(order), MultistepMethod._cdn_b(order_b)
+
         if is_explicit:
             return np.append(np.linalg.inv(B) @ A[:-1] @ a, 0)
+
         return np.linalg.inv(B) @ A @ a
 
     @classmethod
@@ -84,7 +93,7 @@ class MultistepMethod(ODESolver):
 
         if self.is_explicit:
             return -np.sum(
-                self.a[:-1] @ rel_y, axis=0, keepdims=False
+                self.a[:-1] @ rel_y, axis=0, keepdims=False, dtype=real_t
             ) + self.params.h * self.b[:-1] @ self.params.f(rel_t, rel_y)
         else:
             return NotImplemented("step not yet implemented for implicit methods")

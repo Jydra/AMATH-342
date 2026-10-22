@@ -68,7 +68,7 @@ class ODEFunction(ABC):
         self.dim = dim
         self._validate_signature(f)
         self.f = f
-        test_y = np.zeros(dim)
+        test_y = np.zeros(dim, dtype=real_t)
         test_img = f(real_t(0), test_y)
         if test_img.ndim != 1:
             raise ValueError(f"The image of f is not a vector")

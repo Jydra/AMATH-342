@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 
-from lib.ode_types import np_1D_real_arr, np_2D_real_arr
+from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 from lib.ode_solver_params import ODESolverParams
 
 
@@ -47,7 +47,7 @@ class ODESolver(ABC):
         len_yi = len(y_i)  # number of initial values given
         N = self.params.num_steps + 1  # total number of steps, incl. y_i
 
-        y = np.zeros((N, self.params.dim_y))
+        y = np.zeros((N, self.params.dim_y), dtype=real_t)
         y[:len_yi, :] = y_i[:, :]
         t = np.zeros(N)
         t[:len_yi] = [self.params.h * i for i in range(len_yi)]
@@ -65,7 +65,7 @@ class ODESolver(ABC):
         if self.params is None:
             raise ValueError("Solver parameters have not been defined")
 
-        y_0 = np.array([self.params.y_0])
+        y_0 = np.array([self.params.y_0], dtype=real_t)
         t, y = self.solve_from_partial(y_0)
 
         return t, y
