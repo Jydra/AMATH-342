@@ -155,7 +155,7 @@ class BackwardEuler(ODESolver):
         self, t: np_1D_real_arr, y: np_2D_real_arr, i: int, f: ODELinearFunction
     ) -> np_1D_real_arr:
         y_n = y[i - 1 : i, :]
-        t_new = t[i - 1 : i]
+        t_new = t[i - 1 : i] + self.params.h
         f_tnew = f.f_t(t_new)
 
         I_hA = np.eye(self.params.dim_y) - (self.params.h * f.A)
@@ -165,4 +165,57 @@ class BackwardEuler(ODESolver):
         except np.linalg.LinAlgError:
             raise ValueError(f"(I - hA) is not invertible with h={self.params.h}")
 
-        return I_hA_inv @ (y_n + f_tnew)[0]
+        return I_hA_inv @ (y_n + self.params.h * f_tnew)[0]
+
+
+class ThetaMethod(ODESolver):
+    theta: real_t
+
+    def __new__(cls, theta: int | float | real_t):
+        if theta == 0:
+            return ForwardEuler()  # Simpler evaluation
+        elif theta == 1:
+            return BackwardEuler()
+        return super().__new__(cls)
+
+    def __init__(self, theta: int | float | real_t):
+        if theta < 0 or theta > 1:
+            raise ValueError("theta must be in [0, 1]")
+
+        self.theta = real_t(theta)
+
+        is_explicit = theta == 0
+        order = 2 if theta == 1.0 / 2 else 1
+
+        super().__init__(is_explicit, order)
+
+    def _step_implicit_linear(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int, f: ODELinearFunction
+    ) -> np_1D_real_arr:
+        y_n = y[i - 1 : i, :][0]
+        t_n = t[i - 1 : i]
+        t_new = t_n + self.params.h
+        f_tn = f.f_t(t_n)
+        f_tnew = f.f_t(t_new)
+
+        I = np.eye(self.params.dim_y)
+        I_m_thA = I - self.params.h * self.theta * f.A
+        I_p_tchA = I + self.params.h * (1 - self.theta) * f.A
+
+        try:
+            I_m_thA_inv = np.linalg.inv(I_m_thA)
+        except np.linalg.LinAlgError:
+            raise ValueError(f"(I - hA) is not invertible with h={self.params.h}")
+
+        return (
+            I_m_thA_inv
+            @ (
+                I_p_tchA @ y_n
+                + self.params.h * ((1 - self.theta) * f_tn + self.theta * f_tnew)
+            )[0]
+        )
+
+
+class TrapezoidalRule(ThetaMethod):
+    def __new__(cls):
+        return ThetaMethod(0.5)

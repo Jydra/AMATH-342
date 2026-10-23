@@ -213,6 +213,7 @@ class ODETimeFunction(SolverFunction):
 
         self.dim = test_img.shape[0]
 
+        # Handle vectorized method with a flag?
         self.vft = lambda t: np.array([self.f(t_i) for i, t_i in enumerate(t)])
 
     def eval(self, t: real_t) -> np_1D_real_arr:
@@ -282,3 +283,5 @@ class ODELinearFunction(ODEFunction):
             self.f_t = ODETimeFunction(lambda t: np.zeros(dim, dtype=real_t))
         else:
             self.f_t = f_t
+
+    # TODO Add __call__() - there are nontrivial vectorization gains here
