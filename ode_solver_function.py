@@ -245,7 +245,7 @@ class ODETimeFunction(SolverFunction):
         return self.vft(t_slice)
 
 
-class LinearODEFunction(ODEFunction):
+class ODELinearFunction(ODEFunction):
     A: np_2D_real_arr
     f_t: ODETimeFunction
 

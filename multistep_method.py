@@ -3,7 +3,7 @@ import numpy as np
 from lib.constants import TOL
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
-from lib.ode_solver_function import LinearODEFunction
+from lib.ode_solver_function import ODELinearFunction
 from lib.ode_solver import ODESolver, ForwardEuler, BackwardEuler
 from lib.ode_solver_params import ODESolverParams
 
@@ -132,7 +132,7 @@ class MultistepMethod(ODESolver):
         return cls(is_explicit, order, s, a, b)
 
     def set_params(self, params: ODESolverParams):
-        if not self.is_explicit and isinstance(params.f, LinearODEFunction):
+        if not self.is_explicit and isinstance(params.f, ODELinearFunction):
             I = np.eye(params.dim_y)
             asI = self.a[-1] * I
             bshA = self.b[-1] * params.h * params.f.A
@@ -162,7 +162,7 @@ class MultistepMethod(ODESolver):
                 self.a[:-1] @ rel_y, axis=0, keepdims=False, dtype=real_t
             ) + self.params.h * self.b[:-1] @ self.params.f(rel_t, rel_y)
 
-        if not isinstance(self.params.f, LinearODEFunction):
+        if not isinstance(self.params.f, ODELinearFunction):
             return NotImplemented("step not yet implemented for implicit methods")
 
         # TODO How to enforce the definition of these?
@@ -230,7 +230,6 @@ class MultistepMethod(ODESolver):
 
 class Adams_Bashforth(MultistepMethod):
     def __new__(cls, steps: int):
-
         a = np.array([0] * (steps - 1) + [-1, 1])
 
         return MultistepMethod.from_a(a, is_explicit=True)
@@ -238,7 +237,6 @@ class Adams_Bashforth(MultistepMethod):
 
 class Adams_Moulton(MultistepMethod):
     def __new__(cls, steps: int):
-
         a = np.array([0] * (steps - 1) + [-1, 1])
 
         return MultistepMethod.from_a(a, is_explicit=False)
@@ -266,9 +264,7 @@ class BDF(MultistepMethod):
         return 1.0 / np.sum(1.0 / np.arange(1, steps + 1))
 
     def __new__(cls, steps: int):
-
         beta = BDF._beta(steps)
-
         b = np.array([0] * steps + [beta])
 
         return MultistepMethod.from_b(b)

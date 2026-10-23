@@ -3,12 +3,12 @@ import numpy as np
 
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 from lib.ode_solver_params import ODESolverParams
-from lib.ode_solver_function import LinearODEFunction
+from lib.ode_solver_function import ODELinearFunction
 
 
 # TODO
 #   - Resolve: Get rid of implicit flag and make ImplicitODESolver?
-#       > This way, inv(I - hA) logic for LinearODEFunction can be dealt with in __init__
+#       > This way, inv(I - hA) logic for ODELinearFunction can be dealt with in __init__
 #           at the most general level
 class ODESolver(ABC):
     """
@@ -120,7 +120,7 @@ class BackwardEuler(ODESolver):
         return
 
     def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
-        if isinstance(self.params.f, LinearODEFunction):
+        if isinstance(self.params.f, ODELinearFunction):
             y_n = y[i - 1 : i, :]
             t_new = t[i - 1 : i]
             f_tnew = self.params.f.f_t(t_new)
