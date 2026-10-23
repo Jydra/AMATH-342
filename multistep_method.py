@@ -4,7 +4,7 @@ from lib.constants import TOL
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
 from lib.ode_function import LinearODEFunction
-from lib.ode_solver import ODESolver, ForwardEuler
+from lib.ode_solver import ODESolver, ForwardEuler, BackwardEuler
 from lib.ode_solver_params import ODESolverParams
 
 
@@ -196,11 +196,19 @@ class MultistepMethod(ODESolver):
         return y
 
     def solve(
-        self, bootstrapper: ODESolver = ForwardEuler()
+        self, bootstrapper: ODESolver | None = None
     ) -> tuple[np_1D_real_arr, np_2D_real_arr]:
         """
         Refer to ODESolver.solve()
         """
+
+        # Default bootstrap method
+        if bootstrapper is None:
+            if self.is_explicit:
+                bootstrapper = ForwardEuler()
+            else:
+                bootstrapper = BackwardEuler()
+
         y_i = self._bootstrap(bootstrapper)
         return super().solve_from_partial(y_i)
 
