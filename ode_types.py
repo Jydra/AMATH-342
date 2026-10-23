@@ -11,7 +11,7 @@ np_1D_real_arr = np.ndarray[tuple[int], np.dtype[real_t]]
 np_2D_real_arr = np.ndarray[tuple[int, int], np.dtype[real_t]]
 
 # Type of function f for ODEs of form y' = f(t, y(t))
-ftype = Callable[
+f_type = Callable[
     [
         real_t,
         np_1D_real_arr,
@@ -20,4 +20,13 @@ ftype = Callable[
 ]
 
 # Type of vectorized f
-vftype = Callable[[np_1D_real_arr, np_2D_real_arr], np_2D_real_arr]
+vf_type = Callable[[np_1D_real_arr, np_2D_real_arr], np_2D_real_arr]
+
+# Type of function f_t: R -> R^n, dependent on time only, returning vector in phase space
+ft_type = Callable[
+    [real_t],
+    np_1D_real_arr,
+]
+
+# Type of vectorized f_t
+vft_type = Callable[[np_1D_real_arr], np_2D_real_arr]

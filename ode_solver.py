@@ -3,8 +3,13 @@ import numpy as np
 
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 from lib.ode_solver_params import ODESolverParams
+from lib.ode_function import LinearODEFunction
 
 
+# TODO
+#   - Resolve: Get rid of implicit flag and make ImplicitODESolver?
+#       > This way, inv(I - hA) logic for LinearODEFunction can be dealt with in __init__
+#           at the most general level
 class ODESolver(ABC):
     """
     Solves equations of the form y' = f(t, y(t)) by advancing forward from t_0 to
@@ -100,14 +105,14 @@ class ForwardEuler(ODESolver):
     def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
         return np.array(
             y[i - 1 : i, :]
-            + self.params.h * self.params.f(t[i - 1 : i], y[i - 1 : i, :])
+            + self.params.h * self.params.f(t[i - 1 : i], y[i - 1 : i, :]),
+            dtype=real_t,
         )
 
 
 class BackwardEuler(ODESolver):
     # TODO
-    #   - Implement. Requires some form of root-finding method? Either make a new class
-    #       or put in ODEFunction
+    #   - Implement general case. Root finding method?
     is_explicit = False
     order = 1
 
@@ -115,4 +120,20 @@ class BackwardEuler(ODESolver):
         return
 
     def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
-        raise NotImplementedError("Backward Euler method not yet implemented")
+        if isinstance(self.params.f, LinearODEFunction):
+            y_n = y[i - 1 : i, :]
+            t_new = self.params.t_0 + i * self.params.h
+            f_tnew = self.params.f.f_t(t_new)
+
+            I_hA = np.eye(self.params.dim_y) - (self.params.h * self.params.f.A)
+
+            try:
+                I_hA_inv = np.linalg.inv(I_hA)
+            except np.linalg.LinAlgError:
+                raise ValueError(f"(I - hA) is not invertible with h={self.params.h}")
+
+            return I_hA_inv @ (y_n + f_tnew)[0]
+
+        raise NotImplementedError(
+            "Backward Euler method not yet implemented for nonlinear f(t, y(t))"
+        )

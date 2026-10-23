@@ -3,6 +3,7 @@ import numpy as np
 from lib.constants import TOL
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
+from lib.ode_function import LinearODEFunction
 from lib.ode_solver import ODESolver, ForwardEuler
 from lib.ode_solver_params import ODESolverParams
 
@@ -136,8 +137,14 @@ class MultistepMethod(ODESolver):
             return -np.sum(
                 self.a[:-1] @ rel_y, axis=0, keepdims=False, dtype=real_t
             ) + self.params.h * self.b[:-1] @ self.params.f(rel_t, rel_y)
-        else:
+
+        if not isinstance(self.params.f, LinearODEFunction):
             return NotImplemented("step not yet implemented for implicit methods")
+
+        # Linear Implicit Method
+        # TODO
+
+        return NotImplemented("Unknown solver type")
 
     def _bootstrap(self, solver: ODESolver) -> np_2D_real_arr:
         """
