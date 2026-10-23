@@ -214,7 +214,11 @@ class ODETimeFunction(SolverFunction):
         self.dim = test_img.shape[0]
 
         # Handle vectorized method with a flag?
-        self.vft = lambda t: np.array([self.f(t_i) for i, t_i in enumerate(t)])
+        self.vft = lambda t: (
+            lambda a: (
+                np.array([self.f(t_i) for t_i in a]) if np.ndim(t) > 0 else self.f(t)
+            )
+        )(t)
 
     def eval(self, t: real_t) -> np_1D_real_arr:
         """
