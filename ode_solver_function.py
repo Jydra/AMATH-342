@@ -257,7 +257,7 @@ class ODELinearFunction(ODEFunction):
     def __init__(
         self,
         A: np_2D_real_arr | real_t | int | float,
-        f_t: ODETimeFunction | None = None,
+        f_t: ODETimeFunction | Callable | None = None,
     ):
         if (
             np.isscalar(A)
@@ -285,7 +285,9 @@ class ODELinearFunction(ODEFunction):
 
         if f_t is None:
             self.f_t = ODETimeFunction(lambda t: np.zeros(dim, dtype=real_t))
-        else:
+        elif isinstance(f_t, ODETimeFunction):
             self.f_t = f_t
+        else:
+            self.f_t = ODETimeFunction(f_t)
 
     # TODO Add __call__() - there are nontrivial vectorization gains here
