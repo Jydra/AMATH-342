@@ -22,6 +22,8 @@ class MultistepMethod(ODESolver):
         b: np_1D_real_arr,
     ):
         super().__init__(is_explicit, order)
+        if s < 1:
+            raise ValueError("Steps cannot be less than 1")
         self.s = s
         self.a = a
         self.b = b
@@ -225,20 +227,28 @@ class MultistepMethod(ODESolver):
 
 class Adams_Bashforth(MultistepMethod):
     def __new__(cls, steps: int):
-        if steps < 1:
-            raise ValueError("Steps cannot be less than 1")
 
         a = np.array([0] * (steps - 1) + [-1, 1])
 
         return MultistepMethod.from_a(a, is_explicit=True)
 
 
-class BDF(MultistepMethod):
+class Adams_Moulton(MultistepMethod):
     def __new__(cls, steps: int):
-        if steps < 1:
-            raise ValueError("Steps cannot be less than 1")
 
-        beta = 2 / 3
+        a = np.array([0] * (steps - 1) + [-1, 1])
+
+        return MultistepMethod.from_a(a, is_explicit=False)
+
+
+class BDF(MultistepMethod):
+    @classmethod
+    def _beta(cls, steps: int):
+        return 1.0 / np.sum(1.0 / np.arange(1, steps + 1))
+
+    def __new__(cls, steps: int):
+
+        beta = BDF._beta(steps)
 
         b = np.array([0] * steps + [beta])
 
