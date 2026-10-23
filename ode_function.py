@@ -1,6 +1,6 @@
 from inspect import signature
 from abc import ABC
-from typing import get_type_hints, Callable
+from typing import get_type_hints
 import numpy as np
 
 from lib.ode_types import (
@@ -130,17 +130,17 @@ class ODETimeFunction(ABC):
     vft: vft_type  # vectorized f
 
     @classmethod
-    def _validate_signature(cls, f: ft_type) -> None:
+    def _validate_signature(cls, ft: ft_type) -> None:
         """
         Checks fttypeness of self.f signature or type hint.
             - if f_t is a def function, checks both name and type
             - if f_t is a lambda, checks parameter name only
         """
-        if not callable(f):
+        if not callable(ft):
             return False
 
         try:
-            sig = signature(f)
+            sig = signature(ft)
         except (ValueError, TypeError):
             raise ValueError(f"Could not retrieve the function signature of f_t")
 
@@ -162,7 +162,7 @@ class ODETimeFunction(ABC):
         fallback_params = sig_fallback.parameters
 
         if not param_types:
-            param_types = get_type_hints(f)
+            param_types = get_type_hints(ft)
 
         if param_types != target_params and param_types != fallback_params:
             raise ValueError(
@@ -179,11 +179,11 @@ class ODETimeFunction(ABC):
                 f"f has return type {sig.return_annotation}; expected {target_return}"
             )
 
-    def __init__(self, f: ft_type):
-        self._validate_signature(f)
-        self.f = f
+    def __init__(self, ft: ft_type):
+        self._validate_signature(ft)
+        self.ft = ft
 
-        self.vf = lambda t: np.array([self.f(t_i) for i, t_i in enumerate(t)])
+        self.vft = lambda t: np.array([self.ft(t_i) for i, t_i in enumerate(t)])
 
     def eval(self, t: real_t) -> np_1D_real_arr:
         """
@@ -197,7 +197,7 @@ class ODETimeFunction(ABC):
         Returns:
             ndarray[d]: The value of f_t(t)
         """
-        return self.f(t)
+        return self.ft(t)
 
     def __call__(self, t_slice: np_1D_real_arr) -> np_2D_real_arr:
         """
@@ -212,18 +212,20 @@ class ODETimeFunction(ABC):
         Returns:
             ndarray[n, d]: The values of f_t(t)
         """
-        return self.vf(t_slice)
+        return self.vft(t_slice)
 
 
 class LinearODEFunction(ODEFunction):
 
     A: np_2D_real_arr
-    f_t: Callable
+    f_t: ODETimeFunction
     # I_hA_inv: np_2D_real_arr
     # h: real_t
 
     def __init__(
-        self, A: np_2D_real_arr | real_t | int | float, f_t: Callable | None = None
+        self,
+        A: np_2D_real_arr | real_t | int | float,
+        f_t: ODETimeFunction | None = None,
     ):
         # TODO
         #   - Create ODETimeFunction, type check f_t and create vectorized __call__()
@@ -253,7 +255,7 @@ class LinearODEFunction(ODEFunction):
         self.A = A
 
         if f_t is None:
-            self.f_t = lambda t: np.zeros((1, dim), dtype=real_t)
+            self.f_t = ODETimeFunction(lambda t: np.zeros(dim, dtype=real_t))
         else:
             self.f_t = f_t
 

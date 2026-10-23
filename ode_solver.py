@@ -122,7 +122,7 @@ class BackwardEuler(ODESolver):
     def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
         if isinstance(self.params.f, LinearODEFunction):
             y_n = y[i - 1 : i, :]
-            t_new = self.params.t_0 + i * self.params.h
+            t_new = t[i - 1 : i]
             f_tnew = self.params.f.f_t(t_new)
 
             I_hA = np.eye(self.params.dim_y) - (self.params.h * self.params.f.A)

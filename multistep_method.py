@@ -126,6 +126,25 @@ class MultistepMethod(ODESolver):
         a = MultistepMethod._a_from_b(b, order - 1)
         return cls(is_explicit, order, s, a, b)
 
+    def set_params(self, params: ODESolverParams):
+        if not self.is_explicit and isinstance(params.f, LinearODEFunction):
+            I = np.eye(params.dim_y)
+            asI = self.a[-1] * I
+            bshA = self.b[-1] * params.h * params.f.A
+
+            try:
+                self.inv_asI_m_bshA = np.linalg.inv(asI - bshA)
+            except np.linalg.LinAlgError:
+                raise ValueError(
+                    f"Matrix (as * I - bs * h * A) is not invertible for a: {self.a}, b:{self.b}, h:{params.h}"
+                )
+
+            bhA = params.h * self.b[:-1, None, None] * params.f.A
+            aI = -self.a[:-1, None, None] * np.eye(params.dim_y)
+            self.aI_p_bhA = aI + bhA
+
+        return super().set_params(params)
+
     def _step(self, t, y, i):
         """
         Refer to ODESolver._step()
@@ -141,10 +160,16 @@ class MultistepMethod(ODESolver):
         if not isinstance(self.params.f, LinearODEFunction):
             return NotImplemented("step not yet implemented for implicit methods")
 
-        # Linear Implicit Method
-        # TODO
-
-        return NotImplemented("Unknown solver type")
+        # TODO How to enforce the definition of these?
+        rel_y = rel_y[
+            :, :, np.newaxis
+        ]  # reshape rel_y to be an array of column vectors
+        a = self.aI_p_bhA @ rel_y
+        a = a.swapaxes(1, 2).squeeze()  # reshape back to array of row vectors
+        y_rhs = np.sum(a, axis=0)
+        t_rhs = np.sum(self.params.f.f_t(rel_t), axis=0)
+        rhs = self.inv_asI_m_bshA @ (y_rhs + t_rhs)
+        return rhs
 
     def _bootstrap(self, solver: ODESolver) -> np_2D_real_arr:
         """
