@@ -1,16 +1,12 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import Callable
+from typing import Callable, Self
 
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 from lib.ode_solver_params import ODESolverParams
 from lib.ode_solver_function import ODELinearFunction
 
 
-# TODO
-#   - Resolve: Get rid of implicit flag and make ImplicitODESolver?
-#       > This way, inv(I - hA) logic for ODELinearFunction can be dealt with in __init__
-#           at the most general level
 class ODESolver(ABC):
     """
     Solves equations of the form y' = f(t, y(t)) by advancing forward from t_0 to
@@ -32,6 +28,13 @@ class ODESolver(ABC):
 
     def set_params(self, params: ODESolverParams):
         self.params = params
+
+        if not self.is_explicit:
+            f = params.f
+            if isinstance(f, ODELinearFunction):
+                self._step = lambda t, y, i: self._step_implicit_linear(t, y, i, f)
+            else:
+                self._step = self._step_implicit
 
     def solve_from_partial(
         self, y_i: np_2D_real_arr
@@ -83,6 +86,9 @@ class ODESolver(ABC):
 
     _step: Callable[[np_1D_real_arr, np_2D_real_arr, int], np_1D_real_arr]
     """
+    Is set to _step_explicit() or _step.implicit() at __init__() 
+    depending on the value of is_explicit
+
     Calculates the value of y at the next timestep.
 
     Let:
@@ -101,12 +107,20 @@ class ODESolver(ABC):
     def _step_explicit(
         self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
     ) -> np_1D_real_arr:
+        """Explicit version of _step()"""
         raise NotImplementedError("Explicit step not implemented")
 
     def _step_implicit(
         self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
     ) -> np_1D_real_arr:
+        """Implicit version of _step()"""
         raise NotImplementedError("Implicit step not implemented")
+
+    def _step_implicit_linear(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int, f: ODELinearFunction
+    ) -> np_1D_real_arr:
+        """Linear version of _step_implicit()"""
+        raise NotImplementedError("Implicit linear step not implemented")
 
 
 class ForwardEuler(ODESolver):
@@ -137,23 +151,18 @@ class BackwardEuler(ODESolver):
         super().__init__(False, 1)
         return
 
-    def _step_implicit(
-        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    def _step_implicit_linear(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int, f: ODELinearFunction
     ) -> np_1D_real_arr:
-        if isinstance(self.params.f, ODELinearFunction):
-            y_n = y[i - 1 : i, :]
-            t_new = t[i - 1 : i]
-            f_tnew = self.params.f.f_t(t_new)
+        y_n = y[i - 1 : i, :]
+        t_new = t[i - 1 : i]
+        f_tnew = f.f_t(t_new)
 
-            I_hA = np.eye(self.params.dim_y) - (self.params.h * self.params.f.A)
+        I_hA = np.eye(self.params.dim_y) - (self.params.h * f.A)
 
-            try:
-                I_hA_inv = np.linalg.inv(I_hA)
-            except np.linalg.LinAlgError:
-                raise ValueError(f"(I - hA) is not invertible with h={self.params.h}")
+        try:
+            I_hA_inv = np.linalg.inv(I_hA)
+        except np.linalg.LinAlgError:
+            raise ValueError(f"(I - hA) is not invertible with h={self.params.h}")
 
-            return I_hA_inv @ (y_n + f_tnew)[0]
-
-        raise NotImplementedError(
-            "Backward Euler method not yet implemented for nonlinear f(t, y(t))"
-        )
+        return I_hA_inv @ (y_n + f_tnew)[0]

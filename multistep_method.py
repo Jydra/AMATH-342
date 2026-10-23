@@ -164,15 +164,14 @@ class MultistepMethod(ODESolver):
             self.a[:-1] @ rel_y, axis=0, keepdims=False, dtype=real_t
         ) + self.params.h * self.b[:-1] @ self.params.f(rel_t, rel_y)
 
-    def _step_implicit(self, t, y, i):
+    def _step_implicit_linear(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int, f: ODELinearFunction
+    ) -> np_1D_real_arr:
         """
         Refer to ODESolver._step()
         """
         rel_y = y[i - self.s : i, :]
         rel_t = t[i - self.s : i]
-
-        if not isinstance(self.params.f, ODELinearFunction):
-            return NotImplemented("step not yet implemented for implicit methods")
 
         # TODO How to enforce the definition of these?
         rel_y = rel_y[
@@ -181,7 +180,7 @@ class MultistepMethod(ODESolver):
         a = self.aI_p_bhA @ rel_y
         a = a.swapaxes(1, 2).squeeze()  # reshape back to array of row vectors
         y_rhs = np.sum(a, axis=0)
-        t_rhs = np.sum(self.params.f.f_t(rel_t), axis=0)
+        t_rhs = np.sum(f.f_t(rel_t), axis=0)
         rhs = self.inv_asI_m_bshA @ (y_rhs + t_rhs)
         return rhs
 

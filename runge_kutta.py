@@ -3,6 +3,7 @@ import numpy as np
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
 from lib.ode_solver import ODESolver
+from lib.ode_solver_function import ODELinearFunction
 
 # TODO:
 #   - Implement calculate_order()
@@ -59,8 +60,8 @@ class RungeKutta(ODESolver):
         f = self.params.f(t_rel, k)
         return y_i + self.params.h * np.sum(self.b[:, np.newaxis] * f, axis=0)
 
-    def _step_implicit(
-        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    def _step_implicit_linear(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int, f: ODELinearFunction
     ) -> np_1D_real_arr:
         raise NotImplementedError("IRK not yet implemented")
 
