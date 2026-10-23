@@ -30,7 +30,7 @@ class ODESolverParams:
     @classmethod
     def from_raw(
         cls,
-        f: Callable,
+        f: Callable | ODEFunction,
         h: real_t | float | int,
         t_0: real_t | float | int,
         t_star: real_t | float | int,
@@ -58,7 +58,8 @@ class ODESolverParams:
         if y_0.dtype is not real_t:
             y_0 = y_0.astype(real_t)
 
-        f = ODEFunction(dim, f)
+        if not isinstance(f, ODEFunction):
+            f = ODEFunction(dim, f)
 
         h = real_t(h)
         t_0 = real_t(t_0)
