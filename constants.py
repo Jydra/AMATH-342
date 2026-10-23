@@ -1,3 +1,3 @@
 from lib.ode_types import real_t
 
-TOL = real_t(1e-14)
+TOL = real_t(1e-12)

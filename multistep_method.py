@@ -53,19 +53,24 @@ class MultistepMethod(ODESolver):
         #       > If requested order is too low, method overdefined. Accept addn'l conditions?
         #       > If requested order is too high, return an error.
         #       > Consider letting order b a driven value instead of a requested one
-        if len(a) != order:
+        if len(a) + (0 if is_explicit else 1) != order:
             raise ValueError(f"a is length {len(a)}, but order {order}")
         if np.abs(np.sum(a)) >= TOL:
             raise ValueError(f"Coefficients a must sum to 0")
 
-        order_b = order - (1 if is_explicit else 0)  # explicit -> 1 less coeff to solve
+        size_b = order - 1
+        size_a = order - (0 if is_explicit else 1)
 
-        A, B = MultistepMethod._cdn_a(order), MultistepMethod._cdn_b(order_b)
+        A, B = MultistepMethod._cdn_a(size_a), MultistepMethod._cdn_b(size_b)
 
         if is_explicit:
-            return np.append(np.linalg.inv(B) @ A[:-1] @ a[1:], 0)
+            b = np.append(np.linalg.inv(B) @ A[:-1] @ a[1:], 0)
+        else:
+            b = np.linalg.inv(B) @ A @ a[1:]
 
-        return np.linalg.inv(B) @ A @ a[1:]
+        b[np.abs(b) < TOL] = 0
+
+        return b
 
     @classmethod
     def _a_from_b(cls, b: np.ndarray, order: int):
@@ -76,14 +81,12 @@ class MultistepMethod(ODESolver):
         if len(b) != order:
             raise ValueError(f"b is length {len(b)}, but order {order}")
 
-        is_explicit = False
-        if b[-1] != 0:
-            is_explicit = True
-
         A, B = MultistepMethod._cdn_a(order)[:-1], MultistepMethod._cdn_b(order)
 
         a = np.linalg.inv(A) @ B[:-1] @ b
         a = np.insert(a, 0, -np.sum(a))
+
+        a[np.abs(a) < TOL] = 0
 
         return a
 
@@ -237,6 +240,22 @@ class Adams_Moulton(MultistepMethod):
     def __new__(cls, steps: int):
 
         a = np.array([0] * (steps - 1) + [-1, 1])
+
+        return MultistepMethod.from_a(a, is_explicit=False)
+
+
+class ExplicitNystrom(MultistepMethod):
+    def __new__(cls, steps: int):
+        if steps <= 1:
+            raise ValueError("Explict Nystrom steps must be greater than 1")
+        a = np.array([0] * (steps - 2) + [-1, 0, 1])
+
+        return MultistepMethod.from_a(a, is_explicit=True)
+
+
+class ImplicitMilne(MultistepMethod):
+    def __new__(cls, steps: int):
+        a = np.array([0] * (steps - 2) + [-1, 0, 1])
 
         return MultistepMethod.from_a(a, is_explicit=False)
 
