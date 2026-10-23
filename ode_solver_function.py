@@ -32,14 +32,13 @@ class SolverFunction(ABC):
     @abstractmethod
     def dim_out(self) -> int: ...
 
+    @abstractmethod  # init must be defined in child classes
     def __init__(
         self,
         f: Callable,
     ):
         self._validate_signature(f)
         self.f = f
-        self.f = Callable
-        self.vf = lambda t, y: np.array([self.f(t_i, y[i]) for i, t_i in enumerate(t)])
 
     @classmethod
     def _validate_signature(cls, f: Callable) -> None:
@@ -134,9 +133,8 @@ class ODEFunction(SolverFunction):
         return self.dim
 
     def __init__(self, dim: int, f: f_type):
-        self._validate_signature(f)
+        super().__init__(f)
         self.dim = dim
-        self.f = f
 
         test_y = np.zeros(dim, dtype=real_t)
         test_img = f(real_t(0), test_y)
@@ -205,8 +203,7 @@ class ODETimeFunction(SolverFunction):
         return self.dim
 
     def __init__(self, f: ft_type):
-        self._validate_signature(f)
-        self.f = f
+        super().__init__(f)
 
         test_t = real_t(0)
         test_img = f(test_t)
@@ -249,11 +246,8 @@ class ODETimeFunction(SolverFunction):
 
 
 class LinearODEFunction(ODEFunction):
-
     A: np_2D_real_arr
     f_t: ODETimeFunction
-    # I_hA_inv: np_2D_real_arr
-    # h: real_t
 
     def __init__(
         self,
