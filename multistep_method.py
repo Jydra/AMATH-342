@@ -1,5 +1,6 @@
 import numpy as np
 
+from lib.constants import TOL
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
 from lib.ode_solver import ODESolver, ForwardEuler
@@ -28,7 +29,7 @@ class MultistepMethod(ODESolver):
     def _cdn_a(cls, n: int):
         """Generates the conditions of a_m of Thm 2.1 as a matrix"""
         return np.array(
-            [[i**j for i in range(n)] for j in range(1, n + 1)], dtype=real_t
+            [[i**j for i in range(1, n)] for j in range(1, n + 1)], dtype=real_t
         )
 
     @classmethod
@@ -51,18 +52,40 @@ class MultistepMethod(ODESolver):
         #       > Consider letting order b a driven value instead of a requested one
         if len(a) != order:
             raise ValueError(f"a is length {len(a)}, but order {order}")
+        if np.abs(np.sum(a)) >= TOL:
+            raise ValueError(f"Coefficients a must sum to 0")
 
-        order_b = order - (1 if is_explicit else 0)
+        order_b = order - (1 if is_explicit else 0)  # explicit -> 1 less coeff to solve
 
         A, B = MultistepMethod._cdn_a(order), MultistepMethod._cdn_b(order_b)
 
         if is_explicit:
-            return np.append(np.linalg.inv(B) @ A[:-1] @ a, 0)
+            return np.append(np.linalg.inv(B) @ A[:-1] @ a[1:], 0)
 
-        return np.linalg.inv(B) @ A @ a
+        return np.linalg.inv(B) @ A @ a[1:]
 
     @classmethod
-    def from_rho(
+    def _a_from_b(cls, b: np.ndarray, order: int):
+        """
+        Given the coefficients b_m, solves for a_m
+        """
+
+        if len(b) != order:
+            raise ValueError(f"b is length {len(b)}, but order {order}")
+
+        is_explicit = False
+        if b[-1] != 0:
+            is_explicit = True
+
+        A, B = MultistepMethod._cdn_a(order)[:-1], MultistepMethod._cdn_b(order)
+
+        a = np.linalg.inv(A) @ B[:-1] @ b
+        a = np.insert(a, 0, -np.sum(a))
+
+        return a
+
+    @classmethod
+    def from_a(
         cls,
         a: np_1D_real_arr,
         is_explicit: bool = False,
@@ -82,6 +105,24 @@ class MultistepMethod(ODESolver):
         s = len(a) - 1
         order = s + 1 + (0 if is_explicit else 1)
         b = MultistepMethod._b_from_a(a, order, is_explicit)
+        return cls(is_explicit, order, s, a, b)
+
+    @classmethod
+    def from_b(cls, b: np_1D_real_arr):
+        """
+        Given sigma(omega), generates a multistep method of maximal order.
+        """
+        if len(b) <= 1:
+            raise ValueError(f"Length of {b} must be greater than 1")
+
+        is_explicit = False
+        if np.abs(b[-1]) < TOL:
+            is_explicit = True
+
+        s = len(b) - 1
+        order = s + 2
+
+        a = MultistepMethod._a_from_b(b, order - 1)
         return cls(is_explicit, order, s, a, b)
 
     def _step(self, t, y, i):
@@ -140,3 +181,13 @@ class MultistepMethod(ODESolver):
         #   - Implement
         #   - Does this depend on additional factors? Signature may have to change
         raise NotImplementedError("Stability check not yet implemented")
+
+
+class Adams_Bashforth(MultistepMethod):
+    def __new__(cls, steps: int):
+        if steps < 1:
+            raise ValueError("Steps cannot be less than 1")
+
+        a = np.array([0] * (steps - 1) + [-1, 1])
+
+        return MultistepMethod.from_a(a, is_explicit=True)
