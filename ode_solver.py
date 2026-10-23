@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from typing import Callable
 
 from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 from lib.ode_solver_params import ODESolverParams
@@ -23,6 +24,11 @@ class ODESolver(ABC):
     def __init__(self, is_explicit: bool, order: int):
         self.is_explicit = is_explicit
         self.order = order
+
+        if self.is_explicit:
+            self._step = self._step_explicit
+        else:
+            self._step = self._step_implicit
 
     def set_params(self, params: ODESolverParams):
         self.params = params
@@ -75,24 +81,32 @@ class ODESolver(ABC):
 
         return t, y
 
-    @abstractmethod
-    def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
-        """
-        Calculates the value of y at the next timestep.
+    _step: Callable[[np_1D_real_arr, np_2D_real_arr, int], np_1D_real_arr]
+    """
+    Calculates the value of y at the next timestep.
 
-        Let:
-            - N be the total number of steps
-            - d be the dimension of the solution, y(T), at some time T
+    Let:
+        - N be the total number of steps
+        - d be the dimension of the solution, y(T), at some time T
 
-        Parameters:
-            t (ndarray[N]): entire time array
-            y (ndarray[N, d]): entire (partially solved) solution array
-            i (int): current index to be solved
+    Parameters:
+        t (ndarray[N]): entire time array
+        y (ndarray[N, d]): entire (partially solved) solution array
+        i (int): current index to be solved
 
-        Returns:
-            ndarray[d]: Newly solved data point y[i]
-        """
-        pass
+    Returns:
+        ndarray[d]: Newly solved data point y[i]
+    """
+
+    def _step_explicit(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    ) -> np_1D_real_arr:
+        raise NotImplementedError("Explicit step not implemented")
+
+    def _step_implicit(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    ) -> np_1D_real_arr:
+        raise NotImplementedError("Implicit step not implemented")
 
 
 class ForwardEuler(ODESolver):
@@ -100,9 +114,12 @@ class ForwardEuler(ODESolver):
     order = 1
 
     def __init__(self):
+        super().__init__(True, 1)
         return
 
-    def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
+    def _step_explicit(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    ) -> np_1D_real_arr:
         return np.array(
             y[i - 1 : i, :]
             + self.params.h * self.params.f(t[i - 1 : i], y[i - 1 : i, :]),
@@ -117,9 +134,12 @@ class BackwardEuler(ODESolver):
     order = 1
 
     def __init__(self):
+        super().__init__(False, 1)
         return
 
-    def _step(self, t: np_1D_real_arr, y: np_2D_real_arr, i: int) -> np_1D_real_arr:
+    def _step_implicit(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    ) -> np_1D_real_arr:
         if isinstance(self.params.f, ODELinearFunction):
             y_n = y[i - 1 : i, :]
             t_new = t[i - 1 : i]

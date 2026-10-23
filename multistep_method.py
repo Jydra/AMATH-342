@@ -150,17 +150,26 @@ class MultistepMethod(ODESolver):
 
         return super().set_params(params)
 
-    def _step(self, t, y, i):
+    def _step_explicit(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    ) -> np_1D_real_arr:
+        """
+        Refer to ODESolver._step()
+        """
+
+        rel_y = y[i - self.s : i, :]
+        rel_t = t[i - self.s : i]
+
+        return -np.sum(
+            self.a[:-1] @ rel_y, axis=0, keepdims=False, dtype=real_t
+        ) + self.params.h * self.b[:-1] @ self.params.f(rel_t, rel_y)
+
+    def _step_implicit(self, t, y, i):
         """
         Refer to ODESolver._step()
         """
         rel_y = y[i - self.s : i, :]
         rel_t = t[i - self.s : i]
-
-        if self.is_explicit:
-            return -np.sum(
-                self.a[:-1] @ rel_y, axis=0, keepdims=False, dtype=real_t
-            ) + self.params.h * self.b[:-1] @ self.params.f(rel_t, rel_y)
 
         if not isinstance(self.params.f, ODELinearFunction):
             return NotImplemented("step not yet implemented for implicit methods")

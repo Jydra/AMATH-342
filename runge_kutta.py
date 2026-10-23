@@ -4,6 +4,10 @@ from lib.ode_types import real_t, np_1D_real_arr, np_2D_real_arr
 
 from lib.ode_solver import ODESolver
 
+# TODO:
+#   - Implement calculate_order()
+#   - Decide if I want calculate_order() to be part of ODESolver
+
 
 class RungeKutta(ODESolver):
     A: np_2D_real_arr
@@ -30,29 +34,38 @@ class RungeKutta(ODESolver):
 
         implicit_indices = np.triu_indices(rk_dim, k=0)
         implicit_elements = A[implicit_indices]
-        self.is_explicit = bool(np.all(implicit_elements == 0))
 
-    def _step(self, t, y, i):
-        if self.is_explicit:
-            ydim = np.shape(y[0])[0]
+        is_explicit = bool(np.all(implicit_elements == 0))
+        order = self.calculate_order()
 
-            t_i = t[i - 1 : i]
-            t_rel = t_i + self.c * self.params.h
+        super().__init__(is_explicit, order)
 
-            y_i = y[i - 1 : i, :]
-            k = np.zeros((self.rk_dim, ydim), dtype=real_t)
-            k[0] = y_i
+    def _step_explicit(self, t, y, i):
+        ydim = np.shape(y[0])[0]
 
-            for j in range(1, self.rk_dim):
-                f = self.params.f(t_rel[:j], k[:j, :])
-                k[j] = y_i + self.params.h * np.sum(
-                    self.A[j][:j][:, np.newaxis] * f, axis=0
-                )
+        t_i = t[i - 1 : i]
+        t_rel = t_i + self.c * self.params.h
 
-            f = self.params.f(t_rel, k)
-            return y_i + self.params.h * np.sum(self.b[:, np.newaxis] * f, axis=0)
+        y_i = y[i - 1 : i, :]
+        k = np.zeros((self.rk_dim, ydim), dtype=real_t)
+        k[0] = y_i
 
+        for j in range(1, self.rk_dim):
+            f = self.params.f(t_rel[:j], k[:j, :])
+            k[j] = y_i + self.params.h * np.sum(
+                self.A[j][:j][:, np.newaxis] * f, axis=0
+            )
+
+        f = self.params.f(t_rel, k)
+        return y_i + self.params.h * np.sum(self.b[:, np.newaxis] * f, axis=0)
+
+    def _step_implicit(
+        self, t: np_1D_real_arr, y: np_2D_real_arr, i: int
+    ) -> np_1D_real_arr:
         raise NotImplementedError("IRK not yet implemented")
+
+    def calculate_order(self) -> int:  # TODO
+        return -1
 
     def display_tableaux(self):
         raise NotImplementedError()
