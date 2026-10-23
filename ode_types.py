@@ -19,14 +19,8 @@ f_type = Callable[
     np_1D_real_arr,
 ]
 
-# Type of vectorized f
-vf_type = Callable[[np_1D_real_arr, np_2D_real_arr], np_2D_real_arr]
-
 # Type of function f_t: R -> R^n, dependent on time only, returning vector in phase space
 ft_type = Callable[
     [real_t],
     np_1D_real_arr,
 ]
-
-# Type of vectorized f_t
-vft_type = Callable[[np_1D_real_arr], np_2D_real_arr]

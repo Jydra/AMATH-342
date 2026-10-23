@@ -1,6 +1,6 @@
 from inspect import signature
-from abc import ABC
-from typing import get_type_hints
+from abc import ABC, abstractmethod
+from typing import get_type_hints, Callable
 import numpy as np
 
 from lib.ode_types import (
@@ -8,25 +8,43 @@ from lib.ode_types import (
     np_1D_real_arr,
     np_2D_real_arr,
     f_type,
-    vf_type,
     ft_type,
-    vft_type,
 )
 
 
-class ODEFunction(ABC):
-    """
-    Checks ftype signature, vectorized function application
-    """
-
-    dim: int
-    f: f_type
-    vf: vf_type  # vectorized f
+class SolverFunction(ABC):
+    f: Callable
+    vf: Callable
 
     @classmethod
-    def _validate_signature(cls, f: f_type) -> None:
+    @abstractmethod
+    def _target_func_example(cls) -> Callable: ...
+
+    @classmethod
+    @abstractmethod
+    def _fallback_func_example(cls) -> Callable: ...
+
+    @property
+    @abstractmethod
+    def dim_in(self) -> int: ...
+
+    @property
+    @abstractmethod
+    def dim_out(self) -> int: ...
+
+    def __init__(
+        self,
+        f: Callable,
+    ):
+        self._validate_signature(f)
+        self.f = f
+        self.f = Callable
+        self.vf = lambda t, y: np.array([self.f(t_i, y[i]) for i, t_i in enumerate(t)])
+
+    @classmethod
+    def _validate_signature(cls, f: Callable) -> None:
         """
-        Checks ftypeness of self.f signature or type hint.
+        Checks signature of self.f or type hint.
             - if f is a def function, checks both names and types
             - if f is a lambda, checks parameter names only
         """
@@ -38,16 +56,8 @@ class ODEFunction(ABC):
         except (ValueError, TypeError):
             raise ValueError(f"Could not retrieve the function signature of f")
 
-        # Example functions with correct signature.
-        # TODO
-        #   - Resolve: Make these functions class variables to avoid redefining?
-        #       > Likely better to keep them here to enforce immutability
-        #       > This should not get called often, so overhead is not that important
-        def target(t: real_t, y: np_1D_real_arr) -> np_1D_real_arr: ...
-        def fallback(t, y): ...
-
-        sig_target = signature(target)
-        sig_fallback = signature(fallback)
+        sig_target = signature(cls._target_func_example())
+        sig_fallback = signature(cls._fallback_func_example())
 
         # Checks parameter types
         param_types = sig.parameters
@@ -72,10 +82,62 @@ class ODEFunction(ABC):
                 f"f has return type {sig.return_annotation}; expected {target_return}"
             )
 
+    @abstractmethod
+    def eval(self, *args, **kwargs) -> np_1D_real_arr:
+        """
+        Evaluates function given arguments.
+
+        Let:
+            - d be the dimension of the solution, y(T), at some time T
+
+        Returns:
+            ndarray[d]
+        """
+        pass
+
+    @abstractmethod
+    def __call__(self, *args, **kwargs) -> np_2D_real_arr:
+        """
+        Evaluates function for each set of args
+        Requires:
+            - All args are of equal length
+
+        Let:
+            - n be the number of values for which f is to be calculated
+            - d be the dimension of the solution, y(T), at some time T
+
+        Returns:
+            ndarray[n, d]: The values of f
+        """
+        pass
+
+
+class ODEFunction(SolverFunction):
+    @classmethod
+    def _target_func_example(cls) -> Callable:
+        def target(t: real_t, y: np_1D_real_arr) -> np_1D_real_arr: ...
+
+        return target
+
+    @classmethod
+    def _fallback_func_example(cls) -> Callable:
+        def fallback(t, y): ...
+
+        return fallback
+
+    @property
+    def dim_in(self) -> int:
+        return self.dim
+
+    @property
+    def dim_out(self) -> int:
+        return self.dim
+
     def __init__(self, dim: int, f: f_type):
-        self.dim = dim
         self._validate_signature(f)
+        self.dim = dim
         self.f = f
+
         test_y = np.zeros(dim, dtype=real_t)
         test_img = f(real_t(0), test_y)
         if test_img.ndim != 1:
@@ -121,69 +183,40 @@ class ODEFunction(ABC):
         return self.vf(t_slice, y_slice)
 
 
-class ODETimeFunction(ABC):
-    """
-    Checks signature, vectorized function application
-    """
+class ODETimeFunction(SolverFunction):
+    @classmethod
+    def _target_func_example(cls) -> Callable:
+        def target(t: real_t) -> np_1D_real_arr: ...
 
-    ft: ft_type
-    vft: vft_type  # vectorized f
+        return target
 
     @classmethod
-    def _validate_signature(cls, ft: ft_type) -> None:
-        """
-        Checks fttypeness of self.f signature or type hint.
-            - if f_t is a def function, checks both name and type
-            - if f_t is a lambda, checks parameter name only
-        """
-        if not callable(ft):
-            return False
-
-        try:
-            sig = signature(ft)
-        except (ValueError, TypeError):
-            raise ValueError(f"Could not retrieve the function signature of f_t")
-
-        # Example functions with correct signature.
-        # TODO
-        #   - Resolve: Abstract ODEFunction and this into a generic function checker/vectorizer?
-        #   - Resolve: Make these functions class variables to avoid redefining?
-        #       > Likely better to keep them here to enforce immutability
-        #       > This should not get called often, so overhead is not that important
-        def target(t: real_t) -> np_1D_real_arr: ...
+    def _fallback_func_example(cls) -> Callable:
         def fallback(t): ...
 
-        sig_target = signature(target)
-        sig_fallback = signature(fallback)
+        return fallback
 
-        # Checks parameter types
-        param_types = sig.parameters
-        target_params = sig_target.parameters
-        fallback_params = sig_fallback.parameters
+    @property
+    def dim_in(self) -> int:
+        return 1
 
-        if not param_types:
-            param_types = get_type_hints(ft)
+    @property
+    def dim_out(self) -> int:
+        return self.dim
 
-        if param_types != target_params and param_types != fallback_params:
-            raise ValueError(
-                f"f has parameters {param_types}; expected {target_params}"
-            )
+    def __init__(self, f: ft_type):
+        self._validate_signature(f)
+        self.f = f
 
-        # Checks return type
-        return_type = sig.return_annotation
-        target_return = sig_target.return_annotation
-        fallback_return = sig_fallback.return_annotation
+        test_t = real_t(0)
+        test_img = f(test_t)
 
-        if return_type != target_return and return_type != fallback_return:
-            raise ValueError(
-                f"f has return type {sig.return_annotation}; expected {target_return}"
-            )
+        if test_img.ndim != 1:
+            raise ValueError(f"The image of f is not a vector")
 
-    def __init__(self, ft: ft_type):
-        self._validate_signature(ft)
-        self.ft = ft
+        self.dim = test_img.shape[0]
 
-        self.vft = lambda t: np.array([self.ft(t_i) for i, t_i in enumerate(t)])
+        self.vft = lambda t: np.array([self.f(t_i) for i, t_i in enumerate(t)])
 
     def eval(self, t: real_t) -> np_1D_real_arr:
         """
@@ -197,7 +230,7 @@ class ODETimeFunction(ABC):
         Returns:
             ndarray[d]: The value of f_t(t)
         """
-        return self.ft(t)
+        return self.f(t)
 
     def __call__(self, t_slice: np_1D_real_arr) -> np_2D_real_arr:
         """
@@ -227,9 +260,6 @@ class LinearODEFunction(ODEFunction):
         A: np_2D_real_arr | real_t | int | float,
         f_t: ODETimeFunction | None = None,
     ):
-        # TODO
-        #   - Create ODETimeFunction, type check f_t and create vectorized __call__()
-        #   - Determine generality of I_hA_inv, find cleaner way to apply
         if (
             np.isscalar(A)
             or isinstance(A, float)
@@ -258,14 +288,3 @@ class LinearODEFunction(ODEFunction):
             self.f_t = ODETimeFunction(lambda t: np.zeros(dim, dtype=real_t))
         else:
             self.f_t = f_t
-
-    # def set_h(self, h: int | float | real_t) -> None:
-    #     if not isinstance(h, real_t):
-    #         h = real_t(h)
-
-    #     try:
-    #         self.I_hA_inv = np.linalg.inv(np.eye(self.dim) - h * self.A)
-    #     except np.linalg.LinAlgError:
-    #         print("Matrix (I-hA) is not invertible for given h: {h}")
-
-    #     self.h = h

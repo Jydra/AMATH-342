@@ -231,3 +231,15 @@ class Adams_Bashforth(MultistepMethod):
         a = np.array([0] * (steps - 1) + [-1, 1])
 
         return MultistepMethod.from_a(a, is_explicit=True)
+
+
+class BDF(MultistepMethod):
+    def __new__(cls, steps: int):
+        if steps < 1:
+            raise ValueError("Steps cannot be less than 1")
+
+        beta = 2 / 3
+
+        b = np.array([0] * steps + [beta])
+
+        return MultistepMethod.from_b(b)
